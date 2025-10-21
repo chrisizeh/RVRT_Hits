@@ -5,6 +5,7 @@ from glob import glob
 import uproot as uproot
 import awkward as ak
 import numpy as np
+import cv2
 
 from tqdm import tqdm
 
@@ -43,13 +44,14 @@ if __name__ == "__main__":
 
     files = glob(f"{hist_folder}/*.root")
 
-    pixel_opts = {"low_res": 0.2, "high_res": 0.05}
+    pixel_opts = {"low_res": 4, "high_res": 0.5}
 
     file = uproot.open(files[0])
 
     rechits = load_branch_with_highest_cycle(file, 'ticlDumper/rechits').arrays()
     simhits = load_branch_with_highest_cycle(file, 'ticlDumper/simhits').arrays()
     clusters = load_branch_with_highest_cycle(file, 'ticlDumper/clusters').arrays()
+    tracksters = load_branch_with_highest_cycle(file, 'ticlDumper/ticlTrackstersCLUE3DHigh').arrays()
     # Workaround until we have radius
     # rechits["radius"] = ak.full_like(rechits["ID"], 0.5)
     radius = 0.5
@@ -66,7 +68,7 @@ if __name__ == "__main__":
         event_rechits = ak.Array([event_rechits[field] for field in rechits.fields])
 
         event_clusters = clusters[i]
-        print("event_clusters", event_clusters)
+        event_tracksters = tracksters[i]
 
         # Convert directly to Torch tensor
         event_rechits = ak.to_torch(event_rechits).T
@@ -79,77 +81,109 @@ if __name__ == "__main__":
         xmax = event_rechits[:, rechits_field_map["position_x"]].max() + pad
         ymin = event_rechits[:, rechits_field_map["position_y"]].min() - pad
         ymax = event_rechits[:, rechits_field_map["position_y"]].max() + pad
+        
+        for trackster_id in range(event_tracksters.NTracksters):
+            trackster_folder = osp.join(event_folder, f"trackster_{trackster_id}")
+            os.makedirs(trackster_folder, exist_ok=True)
 
-        # ---- Define grid bounds ----
+            for name, pixel in pixel_opts.items():
+                pixel_folder = osp.join(trackster_folder, name)
+                os.makedirs(pixel_folder, exist_ok=True)
 
-        # Use pixel-aligned edges
-        for name, pixel in pixel_opts.items():
-            pixel_folder = osp.join(event_folder, name)
-            os.makedirs(pixel_folder, exist_ok=True)
+                # ---- Define grid bounds ----
 
-            x_edges = torch.arange(torch.floor(xmin / pixel) * pixel, torch.ceil(xmax / pixel) * pixel + pixel, pixel)
-            y_edges = torch.arange(torch.floor(ymin / pixel) * pixel, torch.ceil(ymax / pixel) * pixel + pixel, pixel)
-            x_centers = (x_edges[:-1] + x_edges[1:]) / 2.0
-            y_centers = (y_edges[:-1] + y_edges[1:]) / 2.0
+                # Use pixel-aligned edges
+                x_edges = torch.arange(torch.floor(xmin / pixel) * pixel, torch.ceil(xmax / pixel) * pixel + pixel, pixel)
+                y_edges = torch.arange(torch.floor(ymin / pixel) * pixel, torch.ceil(ymax / pixel) * pixel + pixel, pixel)
+                x_centers = (x_edges[:-1] + x_edges[1:]) / 2.0
+                y_centers = (y_edges[:-1] + y_edges[1:]) / 2.0
 
-            # Grid centers mesh
-            Xc, Yc = torch.meshgrid(x_centers, y_centers, indexing="xy")
+                # Grid centers mesh
+                Xc, Yc = torch.meshgrid(x_centers, y_centers, indexing="xy")
 
-            # ---- Gaussian splatting ----
-            # Energy-normalized 2D isotropic Gaussian: density = E / (2*pi*sigma^2) * exp(-r^2/(2*sigma^2))
-            # Pixel energy is approximated as density(center) * pixel_area
-            pix_area = pixel * pixel
+                # ---- Gaussian splatting ----
+                # Energy-normalized 2D isotropic Gaussian: density = E / (2*pi*sigma^2) * exp(-r^2/(2*sigma^2))
+                # Pixel energy is approximated as density(center) * pixel_area
+                pix_area = pixel * pixel
+                grids = []
+                all_layer_hits = []
 
-            for layer in layers:
-                # grid_cluster = event_clusters[event_clusters["cluster_layer_id"] == layer]
-                grid = torch.zeros_like(Xc)
-                total_energy_points = 0
+                min_r = 0
+                min_phi = 0
 
-                for cluster in range(len(event_clusters["energy"])):
-                    if (event_clusters["cluster_layer_id"][cluster] != layer):
-                        continue
+                for layer in layers:
+                    grid = torch.zeros_like(Xc)
+                    total_energy_points = 0
+                    layer_hits = []
 
-                    # print(event_rechits[:, rechits_field_map["ID"]])
-                    # print(torch.tensor(ak.values_astype(event_clusters["rechits"][cluster], np.int32)))
-                    # print(torch.isin(event_rechits[:, rechits_field_map["ID"]], torch.tensor(ak.values_astype(event_clusters["rechits"][cluster], np.int32))))
-                    rechits_grid = event_rechits[torch.isin(event_rechits[:, rechits_field_map["ID"]], torch.tensor(ak.values_astype(event_clusters["rechits"][cluster], np.int32)))]
-                    total_energy_points += rechits_grid[:, rechits_field_map["energy"]].sum()
+                    for cluster in event_tracksters["vertices_indexes"][trackster_id]:
+                        if (event_clusters["cluster_layer_id"][cluster] != layer):
+                            continue
+                        rechits_grid = event_rechits[torch.isin(event_rechits[:, rechits_field_map["ID"]], torch.tensor(ak.values_astype(event_clusters["rechits"][cluster], np.int64)))]
+                        layer_hits.append(rechits_grid)
+                        total_energy_points += rechits_grid[:, rechits_field_map["energy"]].sum()
 
+                        for hit in rechits_grid:
+                            dx = hit[rechits_field_map["position_x"]] 
+                            dy = hit[rechits_field_map["position_y"]]
+                            r2 = dx * dx + dy * dy
+                            
+                            if (min_r > r2):
+                                min_r = r2
+                                min_phi = np.arctan2(hit[rechits_field_map["position_y"]], hit[rechits_field_map["position_x"]])
 
-                    # print("grid", grid)
-                    for hit in rechits_grid:
-                        # print(hit)
-                        # compute squared distance to this point
-                        dx = Xc - hit[rechits_field_map["position_x"]] 
-                        dy = Yc - hit[rechits_field_map["position_y"]]
+                        if (len(layer_hits) > 0):
+                            all_layer_hits.append(torch.cat(layer_hits))
+                        else:
+                            # add shape, but arbitrary
+                            all_layer_hits.append(torch.empty((1, 1)))
+
+                all_hits = torch.cat(all_layer_hits) 
+                x = all_hits[:, rechits_field_map["position_x"]]
+                y = all_hits[:, rechits_field_map["position_y"]]
+                all_hits[:, rechits_field_map["position_x"]] = x * np.cos(min_phi) - y * np.sin(min_phi)
+                all_hits[:, rechits_field_map["position_y"]] = x * np.sin(min_phi) + y * np.cos(min_phi)
+                min_xy = torch.min(all_hits[:, rechits_field_map["position_x"]:rechits_field_map["position_y"]+1], axis=0)
+                max_xy = torch.max(all_hits[:, rechits_field_map["position_x"]:rechits_field_map["position_y"]+1], axis=0)
+                print(min_xy)
+
+                for hits in all_layer_hits:
+                    grid = torch.zeros_like(Xc)
+                    total_energy_points = 0
+
+                    total_energy_points = hits[:, rechits_field_map["energy"]]
+                    x = hits[:, rechits_field_map["position_x"]]
+                    y = hits[:, rechits_field_map["position_y"]]
+                    hits[:, rechits_field_map["position_x"]] = x * np.cos(min_phi) - y * np.sin(min_phi)
+                    hits[:, rechits_field_map["position_y"]] = x * np.sin(min_phi) + y * np.cos(min_phi)
+
+                    for hit in hits:
+                        dx = Xc - hit[rechits_field_map["position_x"]] - min_xy.values[0].item()
+                        dy = Yc - hit[rechits_field_map["position_y"]] - min_xy.values[1].item()
                         r2 = dx * dx + dy * dy
                         # si = 0.7 * hit[rechits_field_map["radius"]]
                         si = 0.7 * 0.5
                         density = (hit[rechits_field_map["energy"]] / (2.0 * np.pi * si * si)) * torch.exp(-r2 / (2.0 * si * si))
-                        # print(dx, dy, r2, si)
-                        # print("density", hit[rechits_field_map["energy"]], (2.0 * np.pi * si * si), torch.exp(-r2 / (2.0 * si * si)))
                         grid += density * pix_area
-                        # print("grid", grid)
 
-                # Optional: compute total energy in grid for sanity check
-                total_energy_grid = grid.sum()
-                print(total_energy_grid, total_energy_points)
+                    # Optional: compute total energy in grid for sanity check
+                    total_energy_grid = grid.sum()
+                    print(total_energy_grid, total_energy_points)
 
-                fig2, ax2 = plt.subplots(figsize=(6, 6))
-                ax2.set_aspect("equal")
-                ax2.set_title("After: rasterized energy on 0.1 grid")
-                im = ax2.imshow(
-                    grid,
-                    origin="lower",
-                    extent=[x_edges[0], x_edges[-1], y_edges[0], y_edges[-1]],
-                    interpolation="nearest",
-                )
-                ax2.set_xlabel("x")
-                ax2.set_ylabel("y")
-                cbar = fig2.colorbar(im, ax=ax2)
-                cbar.set_label("Energy per pixel")
+                    grid_norm = cv2.normalize(grid.cpu().numpy(), None, 0, 255, cv2.NORM_MINMAX)
+                    grid_uint8 = grid_norm.astype(np.uint8)
+                    grids.append(grid_uint8)
+                    cv2.imwrite(osp.join(pixel_folder, f"layer_{layer}.png"), grid_uint8)
 
-                plt.savefig(osp.join(pixel_folder, f"grid_{layer}"))
-                plt.close()
+                    mv_path = osp.join(pixel_folder, f"all_layers.mp4")
+                    fps = 10  # frames per second
+                    h, w = grids[0].shape[:2]
+                    fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # or 'XVID', 'avc1', etc.
+                    out = cv2.VideoWriter(mv_path, fourcc, fps, (w, h), isColor=False)
 
+                    for frame in grids:
+                        if frame.ndim == 2 and not out.isOpened():
+                            out = cv2.VideoWriter(mv_path, fourcc, fps, (w, h), isColor=False)
+                        out.write(frame)
 
+                    out.release()
