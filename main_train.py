@@ -28,7 +28,7 @@ from models.select_model import define_Model
 '''
 
 
-def main(json_path='options/vrt/001_train_vrt_videosr_bi_reds_6frames.json'):
+def main(json_path='options/rvrt/007_train_rvrt_hits_24frames.json'):
 
     '''
     # ----------------------------------------
