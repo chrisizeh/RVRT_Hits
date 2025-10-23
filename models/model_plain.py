@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 from torch.optim import lr_scheduler
 from torch.optim import Adam
+import torch.distributed as dist
 
 from models.select_network import define_G
 from models.model_base import ModelBase
@@ -164,7 +165,9 @@ class ModelPlain(ModelBase):
         self.G_optimizer.zero_grad()
         self.netG_forward()
         G_loss = self.G_lossfn_weight * self.G_lossfn(self.E, self.H)
+        # torch.cuda.synchronize()
         G_loss.backward()
+        # torch.cuda.synchronize()
 
         # ------------------------------------
         # clip_grad

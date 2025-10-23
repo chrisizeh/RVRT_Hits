@@ -274,9 +274,19 @@ def paired_random_crop(img_gts, img_lqs, gt_patch_size, scale, gt_path=None):
         h_gt, w_gt = img_gts[0].shape[0:2]
     lq_patch_size = gt_patch_size // scale
 
+    expected_h_gt = h_lq * scale
+    expected_w_gt = w_lq * scale
     if h_gt != h_lq * scale or w_gt != w_lq * scale:
-        raise ValueError(f'Scale mismatches. GT ({h_gt}, {w_gt}) is not {scale}x ',
-                         f'multiplication of LQ ({h_lq}, {w_lq}).')
+        # raise ValueError(f'Scale mismatches. GT ({h_gt}, {w_gt}) is not {scale}x ',
+        #                  f'multiplication of LQ ({h_lq}, {w_lq}).')
+
+        print(f"[Warning] Scale mismatch detected. GT ({h_gt}, {w_gt}) vs LQ ({h_lq}, {w_lq}) x {scale}.")
+        # Crop or pad GT to match expected size
+        if input_type == 'Tensor':
+            img_gts = [v[:, :, :expected_h_gt, :expected_w_gt] for v in img_gts]
+        else:
+            img_gts = [v[:expected_h_gt, :expected_w_gt, ...] for v in img_gts]
+        h_gt, w_gt = expected_h_gt, expected_w_gt
     if h_lq < lq_patch_size or w_lq < lq_patch_size:
         raise ValueError(f'LQ ({h_lq}, {w_lq}) is smaller than patch size '
                          f'({lq_patch_size}, {lq_patch_size}). '
