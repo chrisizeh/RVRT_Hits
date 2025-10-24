@@ -142,55 +142,14 @@ def prepare_model_dataset(args):
     ''' prepare model and dataset according to args.task. '''
 
     # define model
-    if args.task == '001_RVRT_videosr_bi_REDS_30frames':
-        model = net(upscale=4, clip_size=2, img_size=[2, 64, 64], window_size=[2, 8, 8], num_blocks=[1, 2, 1],
-                    depths=[2, 2, 2], embed_dims=[144, 144, 144], num_heads=[6, 6, 6],
-                    inputconv_groups=[1, 1, 1, 1, 1, 1], deformable_groups=12, attention_heads=12,
-                    attention_window=[3, 3], cpu_cache_length=100)
-        datasets = ['REDS4']
-        args.scale = 4
-        args.window_size = [2,8,8]
-        args.nonblind_denoising = False
-
-    elif args.task in ['002_RVRT_videosr_bi_Vimeo_14frames', '003_RVRT_videosr_bd_Vimeo_14frames']:
-        model = net(upscale=4, clip_size=2, img_size=[2, 64, 64], window_size=[2, 8, 8], num_blocks=[1, 2, 1],
-                    depths=[2, 2, 2], embed_dims=[144, 144, 144], num_heads=[6, 6, 6],
-                    inputconv_groups=[1, 1, 1, 1, 1, 1], deformable_groups=12, attention_heads=12,
-                    attention_window=[3, 3], cpu_cache_length=100)
-        datasets = ['Vid4'] # 'Vimeo'. Vimeo dataset is too large. Please refer to #training to download it.
-        args.scale = 4
-        args.window_size = [2,8,8]
-        args.nonblind_denoising = False
-
-    elif args.task in ['004_RVRT_videodeblurring_DVD_16frames']:
-        model = net(upscale=1, clip_size=2, img_size=[2, 64, 64], window_size=[2, 8, 8], num_blocks=[1, 2, 1],
-                    depths=[2, 2, 2], embed_dims=[192, 192, 192], num_heads=[6, 6, 6],
-                    inputconv_groups=[1, 3, 3, 3, 3, 3], deformable_groups=12, attention_heads=12,
-                    attention_window=[3, 3], cpu_cache_length=100)
-        datasets = ['DVD10']
-        args.scale = 1
-        args.window_size = [2,8,8]
-        args.nonblind_denoising = False
-
-    elif args.task in ['005_RVRT_videodeblurring_GoPro_16frames']:
-        model = net(upscale=1, clip_size=2, img_size=[2, 64, 64], window_size=[2, 8, 8], num_blocks=[1, 2, 1],
-                    depths=[2, 2, 2], embed_dims=[192, 192, 192], num_heads=[6, 6, 6],
-                    inputconv_groups=[1, 3, 3, 3, 3, 3], deformable_groups=12, attention_heads=12,
-                    attention_window=[3, 3], cpu_cache_length=100)
-        datasets = ['GoPro11-part1', 'GoPro11-part2']
-        args.scale = 1
-        args.window_size = [2,8,8]
-        args.nonblind_denoising = False
-
-    elif args.task == '006_RVRT_videodenoising_DAVIS_16frames':
-        model = net(upscale=1, clip_size=2, img_size=[2, 64, 64], window_size=[2, 8, 8], num_blocks=[1, 2, 1],
-                    depths=[2, 2, 2], embed_dims=[192, 192, 192], num_heads=[6, 6, 6],
-                    inputconv_groups=[1, 3, 4, 6, 8, 4], deformable_groups=12, attention_heads=12,
-                    attention_window=[3, 3], nonblind_denoising=True, cpu_cache_length=100)
-        datasets = ['Set8', 'DAVIS-test']
-        args.scale = 1
-        args.window_size = [2,8,8]
-        args.nonblind_denoising = True
+    model = net(upscale=4, clip_size=2, img_size=[2, 64, 64], window_size=[2, 8, 8], num_blocks=[1, 2, 1],
+                depths=[2, 2, 2], embed_dims=[144, 144, 144], num_heads=[6, 6, 6],
+                inputconv_groups=[1, 1, 1, 1, 1, 1], deformable_groups=12, attention_heads=12,
+                attention_window=[3, 3], cpu_cache_length=100)
+    datasets = ['REDS4']
+    args.scale = 4
+    args.window_size = [2,8,8]
+    args.nonblind_denoising = False
 
     # download model
     model_path = f'model_zoo/rvrt/{args.task}.pth'

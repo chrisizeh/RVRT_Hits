@@ -43,7 +43,8 @@ if __name__ == "__main__":
     hist_folder = osp.join(base_folder, "hits")
     data_folder = osp.join(base_folder, "hitsData")
     os.makedirs(data_folder, exist_ok=True)
-    fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # or 'XVID', 'avc1', etc.
+
+    fourcc = cv2.VideoWriter_fourcc(*'FFV1')
 
     low_res_folder = osp.join(data_folder, "low_res")
     high_res_folder = osp.join(data_folder, "high_res")
@@ -52,7 +53,7 @@ if __name__ == "__main__":
     os.makedirs(high_res_folder, exist_ok=True)
     os.makedirs(video_folder, exist_ok=True)
 
-    files = glob(f"{hist_folder}/*.root")
+    files = glob(f"{hist_folder}/histoRechitsTest.root")
 
     pixel_opts = {"low_res": 0.2, "high_res": 0.05}
 
@@ -248,7 +249,7 @@ if __name__ == "__main__":
                     cv2.imwrite(osp.join(trackster_folder, f"{layer:05d}.png"), grid_uint8)
 
 
-                mv_path = osp.join(video_folder, f"event_{i}_trackster_{trackster_id}_{name}.mp4")
+                mv_path = osp.join(video_folder, f"event_{i}_trackster_{trackster_id}_{name}.avi")
                 fps = 5  # frames per second
                 h, w = grids[0].shape[:2]
 
