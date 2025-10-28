@@ -1,3 +1,18 @@
+# Run 
+## Training Distributed
+
+```
+python3 -m torch.distributed.launch --nproc_per_node=2 --master_port=1234 main_train.py --dist True
+```
+
+## Test
+
+Move model to `model_zoo` and rename to task name.
+
+```
+python3 main_test.py --task 001_train_rvrt_hits --folder_lq /home/czeh/hitsData/low_res/ --folder_gt /home/czeh/hitsData/high_res/ --tile 0 0 0 --save_result
+```
+
 ## Training and testing codes for USRNet, DnCNN, FFDNet, SRMD, DPSR, MSRResNet, ESRGAN, BSRGAN, SwinIR, VRT, RVRT
 [![download](https://img.shields.io/github/downloads/cszn/KAIR/total.svg)](https://github.com/cszn/KAIR/releases) ![visitors](https://visitor-badge.glitch.me/badge?page_id=cszn/KAIR) 
 
