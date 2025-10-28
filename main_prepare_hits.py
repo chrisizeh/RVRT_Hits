@@ -41,7 +41,7 @@ if __name__ == "__main__":
     device = torch.device('cuda' if torch.cuda.is_available() else "cpu")
     base_folder = "/home/czeh"
     hist_folder = osp.join(base_folder, "hits")
-    data_folder = osp.join(base_folder, "hitsData")
+    data_folder = osp.join(base_folder, "hitsDataTrain")
     os.makedirs(data_folder, exist_ok=True)
 
     fourcc = cv2.VideoWriter_fourcc(*'FFV1')
@@ -53,7 +53,8 @@ if __name__ == "__main__":
     os.makedirs(high_res_folder, exist_ok=True)
     os.makedirs(video_folder, exist_ok=True)
 
-    files = glob(f"{hist_folder}/histoRechitsTest.root")
+    files = glob(f"{hist_folder}/histoRechits.root")
+    max_count = 500
 
     pixel_opts = {"low_res": 0.2, "high_res": 0.05}
 
@@ -64,18 +65,19 @@ if __name__ == "__main__":
     simhits = load_branch_with_highest_cycle(file, 'ticlDumper/simhits').arrays()
     clusters = load_branch_with_highest_cycle(file, 'ticlDumper/clusters').arrays()
     tracksters = load_branch_with_highest_cycle(file, 'ticlDumper/ticlTrackstersCLUE3DHigh').arrays()
+
+    print(ak.max(rechits["energy"]))
+
     # Workaround until we have radius
     # rechits["radius"] = ak.full_like(rechits["ID"], 0.5)
     radius = 0.5
 
     rechits_field_map = {name: i for i, name in enumerate(rechits.fields)}
+    simhits_field_map = {name: i for i, name in enumerate(simhits.fields)}
     print(rechits.fields)
     print(simhits.fields)
     print(clusters.fields)
-    for i in range(len(rechits)):
-        # event_folder = osp.join(data_folder, f"event_{i}")
-        # os.makedirs(event_folder, exist_ok=True)
-
+    for i in range(min(max_count, len(rechits))):
         pattern = re.compile(f"^event_{i}_.+$")
         
         if any(pattern.match(d) for d in os.listdir(low_res_folder) if os.path.isdir(os.path.join(low_res_folder, d))):
@@ -87,11 +89,15 @@ if __name__ == "__main__":
         event_rechits = rechits[i]
         event_rechits = ak.Array([event_rechits[field] for field in rechits.fields])
 
+        # event_simhits = simhits[i]
+        # event_simhits = ak.Array([event_simhits[field] for field in simhits.fields])
+
         event_clusters = clusters[i]
         event_tracksters = tracksters[i]
 
         # Convert directly to Torch tensor
         event_rechits = ak.to_torch(event_rechits).T.to(device)
+        # event_simhits = ak.to_torch(event_simhits).T.to(device)
         event_rechits = event_rechits[torch.argsort(event_rechits[:, rechits_field_map["position_z"]])] 
         sigma = torch.tensor([0.7 * radius], device=device) 
         max_sigma = sigma.max().item()
@@ -157,21 +163,6 @@ if __name__ == "__main__":
                 trackster_folder_name = f"event_{i}_trackster_{trackster_id}"
                 trackster_folder = osp.join(data_folder, name, trackster_folder_name)
                 os.makedirs(trackster_folder, exist_ok=True)
-                # pixel_folder = osp.join(trackster_folder, name)
-                # os.makedirs(pixel_folder, exist_ok=True)
-
-                # diff_x = 12.8/pixel - (max_xy[0] - min_xy[0])
-                # print(12.8/pixel)
-                # print((max_xy[0] - min_xy[0]))
-                # if (diff_x > 0):
-                #     min_xy[0] -= diff_x/2
-                #     max_xy[0] += diff_x/2
-                #
-                # print((max_xy[0] - min_xy[0]))
-                # diff_y = 12.8/pixel - (max_xy[1] - min_xy[1])
-                # if (diff_y > 0):
-                #     min_xy[1] -= diff_y/2
-                #     max_xy[1] += diff_y/2
 
                 # Use pixel-aligned edges
                 x_edges = torch.arange(torch.floor(xmin / pixel) * pixel, torch.ceil(xmax / pixel) * pixel + pixel, pixel, device=device)
@@ -214,6 +205,10 @@ if __name__ == "__main__":
                     hits[:, rechits_field_map["position_y"]] = x * np.sin(min_phi) + y * np.cos(min_phi)
 
                     for hit in hits:
+                        # simhits_hit = event_simhits[event_simhits[:, simhits_field_map["ID"]] == hit[rechits_field_map["ID"]]]
+                        # print(simhits_hit.shape)
+
+
                         dx = Xc - hit[rechits_field_map["position_x"]]
                         dy = Yc - hit[rechits_field_map["position_y"]]
                         r2 = dx * dx + dy * dy
@@ -226,39 +221,39 @@ if __name__ == "__main__":
                     total_energy_grid = grid.sum()
                     # print(layer, total_energy_grid, total_energy_points)
 
-                    grid_cut = grid[y_mask][:, x_mask].cpu().numpy()
-                    grid_norm = cv2.normalize(grid_cut, None, 0, 255, cv2.NORM_MINMAX)
-                    #comment line for training!
-                    # grid_norm = cv2.bitwise_not(grid_norm)
+                    grid_cut = grid[y_mask][:, x_mask].cpu().numpy() * 100
+                    # grid_norm = np.clip(grid_cut * 2.5, a_min=0, a_max=65535)
+                    # grid_norm = cv2.normalize(grid_cut, None, 0, 255, cv2.NORM_MINMAX)
 
-                    grid_uint8 = grid_norm.astype(np.uint8)
-
-                    pad_h = max(0, int(12.8/pixel) - grid_uint8.shape[0])
-                    pad_w = max(0, int(12.8/pixel) - grid_uint8.shape[1])
+                    # grid_uint16 = grid_norm.astype(np.uint16)
+                    #
+                    pad_h = max(0, int(12.8/pixel) - grid_cut.shape[0])
+                    pad_w = max(0, int(12.8/pixel) - grid_cut.shape[1])
 
                     # Pad bottom and right
-                    grid_uint8 = cv2.copyMakeBorder(
-                        grid_uint8,
+                    grid_cut = cv2.copyMakeBorder(
+                        grid_cut,
                         top=pad_h, bottom=0,
                         left=0, right=pad_w,
                         borderType=cv2.BORDER_CONSTANT,
                         value=0  # fill with black
                     )
 
-                    grids.append(grid_uint8)
-                    cv2.imwrite(osp.join(trackster_folder, f"{layer:05d}.png"), grid_uint8)
+                    grids.append(grid_cut)
+                    cv2.imwrite(osp.join(trackster_folder, f"{layer:05d}.png"), grid_cut)
 
 
-                mv_path = osp.join(video_folder, f"event_{i}_trackster_{trackster_id}_{name}.avi")
-                fps = 5  # frames per second
                 h, w = grids[0].shape[:2]
-
-                out = cv2.VideoWriter(mv_path, fourcc, fps, (w, h), isColor=False)
-                for frame in grids:
-                    out.write(frame)
-
-                out.release()
-            metadata_lines.append(f"{trackster_folder_name} {len(layers)} ({grid_uint8.shape[0]},{grid_uint8.shape[1]},1) {layers[0]:05d}")
+                # Don't store video for now, as only accept integer
+                # mv_path = osp.join(video_folder, f"event_{i}_trackster_{trackster_id}_{name}.avi")
+                # fps = 5  # frames per second
+                #
+                # out = cv2.VideoWriter(mv_path, fourcc, fps, (w, h), isColor=False)
+                # for frame in grids:
+                #     out.write(frame)
+                #
+                # out.release()
+            metadata_lines.append(f"{trackster_folder_name} {len(layers)} ({grid_cut.shape[0]},{grid_cut.shape[1]},1) {layers[0]:05d}")
 
         metadata_path = osp.join(data_folder, "metadata.txt")
         with open(metadata_path, "w") as f:
