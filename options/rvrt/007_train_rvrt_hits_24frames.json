@@ -1,5 +1,5 @@
 {
-  "task": "001_train_rvrt_hits"
+  "task": "004_train_rvrt_hits"
   , "model": "vrt"
   , "gpu_ids": [0, 1]
   , "dist": true
@@ -24,7 +24,7 @@
       , "dataroot_lq": "/home/czeh/hitsDataTrain/low_res"
       , "meta_info_file": "/home/czeh/hitsDataTrain/metadata.txt"
       , "filename_tmpl": "05d"
-      , "filename_ext": "png"
+      , "filename_ext": "pt"
       , "val_partition": "official"
       , "test_mode": false
       , "io_backend": {"type": "disk"}

@@ -245,13 +245,12 @@ def main(json_path='options/rvrt/007_train_rvrt_hits_24frames.json'):
                         img = output[i, ...].clamp_(0, 1).numpy()
                         if img.ndim == 3:
                             img = np.transpose(img[[2, 1, 0], :, :], (1, 2, 0))  # CHW-RGB to HCW-BGR
-                        img = (img * 255.0).round().astype(np.uint8)  # float32 to uint8
                         if opt['val']['save_img']:
                             save_dir = opt['path']['images']
                             util.mkdir(save_dir)
                             seq_ = os.path.basename(test_data['lq_path'][i][0]).split('.')[0]
                             os.makedirs(f'{save_dir}/{folder[0]}', exist_ok=True)
-                            cv2.imwrite(f'{save_dir}/{folder[0]}/{seq_}_{current_step:d}.png', img)
+                            torch.save(img, f'{save_dir}/{folder[0]}/{seq_}_{current_step:d}.pt')
 
                         # -----------------------
                         # calculate PSNR
@@ -259,7 +258,6 @@ def main(json_path='options/rvrt/007_train_rvrt_hits_24frames.json'):
                         img_gt = gt[i, ...].clamp_(0, 1).numpy()
                         if img_gt.ndim == 3:
                             img_gt = np.transpose(img_gt[[2, 1, 0], :, :], (1, 2, 0))  # CHW-RGB to HCW-BGR
-                        img_gt = (img_gt * 255.0).round().astype(np.uint8)  # float32 to uint8
                         img_gt = np.squeeze(img_gt)
 
                         test_results_folder['psnr'].append(util.calculate_psnr(img, img_gt, border=0))

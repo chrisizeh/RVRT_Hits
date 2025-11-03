@@ -11,7 +11,7 @@ import cv2
 from tqdm import tqdm
 
 import torch
-import matplotlib.pyplot as plt
+import torch.nn.functional as F
 
 
 def load_branch_with_highest_cycle(file, branch_name):
@@ -185,14 +185,14 @@ if __name__ == "__main__":
                     continue
 
                 # maybe edd missing on both sides, not just one
-                if (name == "high_res"):
-                    # print(w*4, Xc[y_mask][:, x_mask].shape[1])
-                    if (h*4 != Xc[y_mask][:, x_mask].shape[0]):
-                        diff = Xc[y_mask][:, x_mask].shape[0] - h*4 
-                        y_mask = (y_centers >= (min_xy[1]+diff*pixel)) & (y_centers <= max_xy[1])
-                    if (w*4 != Xc[y_mask][:, x_mask].shape[1]):
-                        diff = Xc[y_mask][:, x_mask].shape[1] - w*4 
-                        x_mask = (x_centers >= (min_xy[0]+diff*pixel)) & (x_centers <= max_xy[0])
+                # if (name == "high_res"):
+                #     # print(w*4, Xc[y_mask][:, x_mask].shape[1])
+                #     if (h*4 != Xc[y_mask][:, x_mask].shape[0]):
+                #         diff = Xc[y_mask][:, x_mask].shape[0] - h*4 
+                #         y_mask = (y_centers >= (min_xy[1]+diff*pixel)) & (y_centers <= max_xy[1])
+                #     if (w*4 != Xc[y_mask][:, x_mask].shape[1]):
+                #         diff = Xc[y_mask][:, x_mask].shape[1] - w*4 
+                #         x_mask = (x_centers >= (min_xy[0]+diff*pixel)) & (x_centers <= max_xy[0])
                     # print(w*4, Xc[y_mask][:, x_mask].shape[1])
 
                 grids = []
@@ -221,26 +221,36 @@ if __name__ == "__main__":
                     total_energy_grid = grid.sum()
                     # print(layer, total_energy_grid, total_energy_points)
 
-                    grid_cut = grid[y_mask][:, x_mask].cpu().numpy() * 100
-                    # grid_norm = np.clip(grid_cut * 2.5, a_min=0, a_max=65535)
-                    # grid_norm = cv2.normalize(grid_cut, None, 0, 255, cv2.NORM_MINMAX)
+                    target_hw = int(round(12.8 / pixel))
+                    grid_cut = grid[y_mask][:, x_mask].cpu()
 
-                    # grid_uint16 = grid_norm.astype(np.uint16)
-                    #
-                    pad_h = max(0, int(12.8/pixel) - grid_cut.shape[0])
-                    pad_w = max(0, int(12.8/pixel) - grid_cut.shape[1])
+                    H, W = grid_cut.shape
+                    # crop center if larger than target
+                    if H > target_hw:
+                        top = (H - target_hw) // 2
+                        grid_cut = grid_cut[top:top + target_hw, :]
+                    if W > target_hw:
+                        left = (W - target_hw) // 2
+                        grid_cut = grid_cut[:, left:left + target_hw]
 
-                    # Pad bottom and right
-                    grid_cut = cv2.copyMakeBorder(
-                        grid_cut,
-                        top=pad_h, bottom=0,
-                        left=0, right=pad_w,
-                        borderType=cv2.BORDER_CONSTANT,
-                        value=0  # fill with black
-                    )
+                    # recompute after crop
+                    H, W = grid_cut.shape
+
+                    pad_h = max(0, target_hw - H)
+                    pad_w = max(0, target_hw - W)
+
+                    # symmetric padding: (left, right, top, bottom)
+                    pad_top    = pad_h // 2
+                    pad_bottom = pad_h - pad_top
+                    pad_left   = pad_w // 2
+                    pad_right  = pad_w - pad_left
+
+                    # F.pad expects (left, right, top, bottom) for 2D tensors; add channel dim first
+                    grid_cut = grid_cut.unsqueeze(0)  # (1, H, W)
+                    grid_cut = F.pad(grid_cut, (pad_left, pad_right, pad_top, pad_bottom), mode='constant', value=0)
 
                     grids.append(grid_cut)
-                    cv2.imwrite(osp.join(trackster_folder, f"{layer:05d}.png"), grid_cut)
+                    torch.save(grid_cut, osp.join(trackster_folder, f"{layer:05d}.pt"))
 
 
                 h, w = grids[0].shape[:2]

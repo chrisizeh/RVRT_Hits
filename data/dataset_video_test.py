@@ -92,7 +92,7 @@ class VideoRecurrentTestDataset(data.Dataset):
 
         # Find unique folder strings
         self.folders = sorted(list(set(self.data_info['folder'])))
-        self.sigma = opt['sigma'] / 255. if 'sigma' in opt else 0 # for non-blind video denoising
+        self.sigma = opt['sigma'] if 'sigma' in opt else 0 # for non-blind video denoising
 
     def __getitem__(self, index):
         folder = self.folders[index]
@@ -257,9 +257,9 @@ class VideoTestVimeo90KDataset(data.Dataset):
         with open(opt['meta_info_file'], 'r') as fin:
             subfolders = [line.split(' ')[0] for line in fin]
         for idx, subfolder in enumerate(subfolders):
-            gt_path = osp.join(self.gt_root, subfolder, 'im4.png')
+            gt_path = osp.join(self.gt_root, subfolder, 'im4.pt')
             self.data_info['gt_path'].append(gt_path)
-            lq_paths = [osp.join(self.lq_root, subfolder, f'im{i}.png') for i in neighbor_list]
+            lq_paths = [osp.join(self.lq_root, subfolder, f'im{i}.pt') for i in neighbor_list]
             self.data_info['lq_path'].append(lq_paths)
             self.data_info['folder'].append(subfolder)
             self.data_info['idx'].append(f'{idx}/{len(subfolders)}')
@@ -299,7 +299,7 @@ class VFI_DAVIS(data.Dataset):
     Modified from https://github.com/tarun005/FLAVR/blob/main/dataset/Davis_test.py
     """
 
-    def __init__(self, data_root, ext="png"):
+    def __init__(self, data_root, ext="pt"):
 
         super().__init__()
 
@@ -329,7 +329,7 @@ class VFI_DAVIS(data.Dataset):
             'L': torch.stack(images[:2] + images[3:], 0),
             'H': images[2].unsqueeze(0),
             'folder': str(idx),
-            'gt_path': ['vfi_result.png'],
+            'gt_path': ['vfi_result.pt'],
         }
 
     def __len__(self):
@@ -341,7 +341,7 @@ class VFI_UCF101(data.Dataset):
         Modified from https://github.com/tarun005/FLAVR/blob/main/dataset/ucf101_test.py
     """
 
-    def __init__(self, data_root, ext="png"):
+    def __init__(self, data_root, ext="pt"):
         super().__init__()
 
         self.data_root = data_root
@@ -376,7 +376,7 @@ class VFI_Vid4(data.Dataset):
     Modified from https://github.com/tarun005/FLAVR/blob/main/dataset/Davis_test.py
     """
 
-    def __init__(self, data_root, ext="png"):
+    def __init__(self, data_root, ext="pt"):
 
         super().__init__()
 

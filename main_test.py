@@ -89,18 +89,16 @@ def main():
             img = output[:, i, ...].data.squeeze().float().cpu().clamp_(0, 1).numpy()
             if img.ndim == 3:
                 img = np.transpose(img[[2, 1, 0], :, :], (1, 2, 0))  # CHW-RGB to HCW-BGR
-            img = (img * 255.0).round().astype(np.uint8)  # float32 to uint8
             if args.save_result:
                 seq_ = osp.basename(batch['lq_path'][i][0]).split('.')[0]
                 os.makedirs(f'{save_dir}/{folder[0]}', exist_ok=True)
-                cv2.imwrite(f'{save_dir}/{folder[0]}/{seq_}.png', img)
+                torch.save(img, f'{save_dir}/{folder[0]}/{seq_}.pt')
 
             # evaluate psnr/ssim
             if gt is not None:
                 img_gt = gt[:, i, ...].data.squeeze().float().cpu().clamp_(0, 1).numpy()
                 if img_gt.ndim == 3:
                     img_gt = np.transpose(img_gt[[2, 1, 0], :, :], (1, 2, 0))  # CHW-RGB to HCW-BGR
-                img_gt = (img_gt * 255.0).round().astype(np.uint8)  # float32 to uint8
                 img_gt = np.squeeze(img_gt)
 
                 test_results_folder['psnr'].append(util.calculate_psnr(img, img_gt, border=0))

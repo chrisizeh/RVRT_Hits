@@ -68,11 +68,7 @@ def read_img_seq(path, require_mod_crop=False, scale=1, return_imgname=False):
         img_paths = path
     else:
         img_paths = sorted(list(scandir(path, full_path=True)))
-    imgs = [cv2.imread(v).astype(np.float32) / 255. for v in img_paths]
-
-    if require_mod_crop:
-        imgs = [mod_crop(img, scale) for img in imgs]
-    imgs = img2tensor(imgs, bgr2rgb=True, float32=True)
+    imgs = [torch.load(v) / 255. for v in img_paths]
     imgs = torch.stack(imgs, dim=0)
 
     if return_imgname:
@@ -80,35 +76,6 @@ def read_img_seq(path, require_mod_crop=False, scale=1, return_imgname=False):
         return imgs, imgnames
     else:
         return imgs
-
-
-def img2tensor(imgs, bgr2rgb=True, float32=True):
-    """Numpy array to tensor.
-
-    Args:
-        imgs (list[ndarray] | ndarray): Input images.
-        bgr2rgb (bool): Whether to change bgr to rgb.
-        float32 (bool): Whether to change to float32.
-
-    Returns:
-        list[tensor] | tensor: Tensor images. If returned results only have
-            one element, just return tensor.
-    """
-
-    def _totensor(img, bgr2rgb, float32):
-        if img.shape[2] == 3 and bgr2rgb:
-            if img.dtype == 'float64':
-                img = img.astype('float32')
-            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        img = torch.from_numpy(img.transpose(2, 0, 1))
-        if float32:
-            img = img.float()
-        return img
-
-    if isinstance(imgs, list):
-        return [_totensor(img, bgr2rgb, float32) for img in imgs]
-    else:
-        return _totensor(imgs, bgr2rgb, float32)
 
 
 def tensor2img(tensor, rgb2bgr=True, out_type=np.uint8, min_max=(0, 1)):
@@ -283,7 +250,7 @@ def paired_random_crop(img_gts, img_lqs, gt_patch_size, scale, gt_path=None):
         print(f"[Warning] Scale mismatch detected. GT ({h_gt}, {w_gt}) vs LQ ({h_lq}, {w_lq}) x {scale}.")
         # Crop or pad GT to match expected size
         if input_type == 'Tensor':
-            img_gts = [v[:, :, :expected_h_gt, :expected_w_gt] for v in img_gts]
+            img_gts = [v[:, :expected_h_gt, :expected_w_gt] for v in img_gts]
         else:
             img_gts = [v[:expected_h_gt, :expected_w_gt, ...] for v in img_gts]
         h_gt, w_gt = expected_h_gt, expected_w_gt
@@ -298,14 +265,14 @@ def paired_random_crop(img_gts, img_lqs, gt_patch_size, scale, gt_path=None):
 
     # crop lq patch
     if input_type == 'Tensor':
-        img_lqs = [v[:, :, top:top + lq_patch_size, left:left + lq_patch_size] for v in img_lqs]
+        img_lqs = [v[:, top:top + lq_patch_size, left:left + lq_patch_size] for v in img_lqs]
     else:
         img_lqs = [v[top:top + lq_patch_size, left:left + lq_patch_size, ...] for v in img_lqs]
 
     # crop corresponding gt patch
     top_gt, left_gt = int(top * scale), int(left * scale)
     if input_type == 'Tensor':
-        img_gts = [v[:, :, top_gt:top_gt + gt_patch_size, left_gt:left_gt + gt_patch_size] for v in img_gts]
+        img_gts = [v[:, top_gt:top_gt + gt_patch_size, left_gt:left_gt + gt_patch_size] for v in img_gts]
     else:
         img_gts = [v[top_gt:top_gt + gt_patch_size, left_gt:left_gt + gt_patch_size, ...] for v in img_gts]
     if len(img_gts) == 1:
@@ -373,10 +340,7 @@ class HardDiskBackend(BaseStorageBackend):
     """Raw hard disks storage backend."""
 
     def get(self, filepath):
-        filepath = str(filepath)
-        with open(filepath, 'rb') as f:
-            value_buf = f.read()
-        return value_buf
+        return torch.load(filepath)
 
     def get_text(self, filepath):
         filepath = str(filepath)
@@ -479,25 +443,4 @@ class FileClient(object):
 
     def get_text(self, filepath):
         return self.client.get_text(filepath)
-
-
-def imfrombytes(content, flag='color', float32=False):
-    """Read an image from bytes.
-
-    Args:
-        content (bytes): Image bytes got from files or other streams.
-        flag (str): Flags specifying the color type of a loaded image,
-            candidates are `color`, `grayscale` and `unchanged`.
-        float32 (bool): Whether to change to float32., If True, will also norm
-            to [0, 1]. Default: False.
-
-    Returns:
-        ndarray: Loaded image array.
-    """
-    img_np = np.frombuffer(content, np.uint8)
-    imread_flags = {'color': cv2.IMREAD_COLOR, 'grayscale': cv2.IMREAD_GRAYSCALE, 'unchanged': cv2.IMREAD_UNCHANGED}
-    img = cv2.imdecode(img_np, imread_flags[flag])
-    if float32:
-        img = img.astype(np.float32) / 255.
-    return img
 
