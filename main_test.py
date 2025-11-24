@@ -86,7 +86,7 @@ def main():
 
         for i in range(output.shape[1]):
             # save image
-            img = output[:, i, ...].data.squeeze().float().cpu().clamp_(0, 1).numpy()
+            img = output[:, i, ...].data.squeeze().float().cpu().clamp_(0, 5).numpy()
             if img.ndim == 3:
                 img = np.transpose(img[[2, 1, 0], :, :], (1, 2, 0))  # CHW-RGB to HCW-BGR
             if args.save_result:
@@ -96,7 +96,7 @@ def main():
 
             # evaluate psnr/ssim
             if gt is not None:
-                img_gt = gt[:, i, ...].data.squeeze().float().cpu().clamp_(0, 1).numpy()
+                img_gt = gt[:, i, ...].data.squeeze().float().cpu().clamp_(0, 5).numpy()
                 if img_gt.ndim == 3:
                     img_gt = np.transpose(img_gt[[2, 1, 0], :, :], (1, 2, 0))  # CHW-RGB to HCW-BGR
                 img_gt = np.squeeze(img_gt)

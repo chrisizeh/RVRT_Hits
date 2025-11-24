@@ -1,10 +1,10 @@
 import os
-from PIL import Image
 import numpy as np
+import torch
 
 # Paths to your two main folders
 true_path = "/home/czeh/hitsData/high_res"
-reco_path = "/home/czeh/RVRT_Hits/results/002_train_rvrt_hits"
+reco_path = "/home/czeh/RVRT_Hits/results/006_train_rvrt_hits"
 
 ratios = []
 for subfolder in os.listdir(true_path):
@@ -25,8 +25,8 @@ for subfolder in os.listdir(true_path):
             continue  # skip if not found in path2
 
         # Load both images
-        img1 = np.array(Image.open(img_path1))
-        img2 = np.array(Image.open(img_path2))
+        img1 = torch.load(img_path1) * 50
+        img2 = torch.load(img_path2)
 
         # Add pixel sums to totals
         total_true += img1.sum()
@@ -36,7 +36,7 @@ for subfolder in os.listdir(true_path):
     ratio = (total_reco / total_true) if total_true != 0 else 0
     ratios.append(ratio)
 
-    print(f"{subfolder}: {ratio}")
+    print(f"{subfolder}: true {total_true}, reco {total_reco}, ratio {ratio}")
 
 mean = np.mean(ratios)  # sample standard deviation
 stdev = np.std(ratios, ddof=1)  # sample standard deviation

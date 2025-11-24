@@ -168,8 +168,6 @@ class VideoRecurrentTrainDataset(data.Dataset):
 
         img_gts = torch.stack(img_results[len(img_lqs) // 2:], dim=0)
         img_lqs = torch.stack(img_results[:len(img_lqs) // 2], dim=0)
-        print(img_gts.shape)
-        print(img_lqs.shape)
 
         # img_lqs: (t, c, h, w)
         # img_gts: (t, c, h, w)

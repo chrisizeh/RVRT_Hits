@@ -75,8 +75,6 @@ class VGGFeatureExtractor(nn.Module):
         else:
             self.features = nn.Sequential(*list(model.features.children())[:(feature_layer + 1)])
 
-        print(self.features)
-
         # No need to BP to variable
         for k, v in self.features.named_parameters():
             v.requires_grad = False
@@ -119,6 +117,7 @@ class PerceptualLoss(nn.Module):
         Returns:
             Tensor: Forward results.
         """
+        gt = gt * 50
         x_vgg, gt_vgg = self.vgg(x), self.vgg(gt.detach())
         loss = 0.0
         if isinstance(x_vgg, list):

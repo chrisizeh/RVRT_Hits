@@ -667,7 +667,7 @@ class RSTBWithInputConv(nn.Module):
          **kwarg: Args for RSTB.
     """
 
-    def __init__(self, in_channels=3, kernel_size=(1, 3, 3), stride=1, groups=1, num_blocks=2, **kwargs):
+    def __init__(self, in_channels=1, kernel_size=(1, 3, 3), stride=1, groups=1, num_blocks=2, **kwargs):
         super().__init__()
 
         main = []
@@ -809,48 +809,20 @@ class RVRT(nn.Module):
         self.spynet = SpyNet(spynet_path)
 
         # shallow feature extraction
-        if self.upscale == 4:
-            # video sr
-            self.feat_extract = RSTBWithInputConv(in_channels=3,
-                                                  kernel_size=(1, 3, 3),
-                                                  groups=inputconv_groups[0],
-                                                  num_blocks=num_blocks[0],
-                                                  dim=embed_dims[0],
-                                                  input_resolution=[1, img_size[1], img_size[2]],
-                                                  depth=depths[0],
-                                                  num_heads=num_heads[0],
-                                                  window_size=[1, window_size[1], window_size[2]],
-                                                  mlp_ratio=mlp_ratio,
-                                                  qkv_bias=qkv_bias, qk_scale=qk_scale,
-                                                  norm_layer=norm_layer,
-                                                  use_checkpoint_attn=[False],
-                                                  use_checkpoint_ffn=[False]
-                                                  )
-        else:
-            # video deblurring/denoising
-            self.feat_extract = nn.Sequential(Rearrange('n d c h w -> n c d h w'),
-                                              nn.Conv3d(4 if self.nonblind_denoising else 3, embed_dims[0], (1, 3, 3),
-                                                        (1, 2, 2), (0, 1, 1)),
-                                              nn.LeakyReLU(negative_slope=0.1, inplace=True),
-                                              nn.Conv3d(embed_dims[0], embed_dims[0], (1, 3, 3), (1, 2, 2), (0, 1, 1)),
-                                              nn.LeakyReLU(negative_slope=0.1, inplace=True),
-                                              Rearrange('n c d h w -> n d c h w'),
-                                              RSTBWithInputConv(
-                                                                in_channels=embed_dims[0],
-                                                                kernel_size=(1, 3, 3),
-                                                                groups=inputconv_groups[0],
-                                                                num_blocks=num_blocks[0],
-                                                                dim=embed_dims[0],
-                                                                input_resolution=[1, img_size[1], img_size[2]],
-                                                                depth=depths[0],
-                                                                num_heads=num_heads[0],
-                                                                window_size=[1, window_size[1], window_size[2]],
-                                                                mlp_ratio=mlp_ratio,
-                                                                qkv_bias=qkv_bias, qk_scale=qk_scale,
-                                                                norm_layer=norm_layer,
-                                                                use_checkpoint_attn=[False],
-                                                                use_checkpoint_ffn=[False]
-                                                               )
+        self.feat_extract = RSTBWithInputConv(in_channels=1,
+                                              kernel_size=(1, 3, 3),
+                                              groups=inputconv_groups[0],
+                                              num_blocks=num_blocks[0],
+                                              dim=embed_dims[0],
+                                              input_resolution=[1, img_size[1], img_size[2]],
+                                              depth=depths[0],
+                                              num_heads=num_heads[0],
+                                              window_size=[1, window_size[1], window_size[2]],
+                                              mlp_ratio=mlp_ratio,
+                                              qkv_bias=qkv_bias, qk_scale=qk_scale,
+                                              norm_layer=norm_layer,
+                                              use_checkpoint_attn=[False],
+                                              use_checkpoint_ffn=[False]
                                               )
 
         # check if the sequence is augmented by flipping
@@ -912,7 +884,7 @@ class RVRT(nn.Module):
                                                   nn.LeakyReLU(negative_slope=0.1, inplace=True)
                                                   )
         self.upsampler = Upsample(4, 64)
-        self.conv_last = nn.Conv3d(64, 3, kernel_size=(1, 3, 3), padding=(0, 1, 1))
+        self.conv_last = nn.Conv3d(64, 1, kernel_size=(1, 3, 3), padding=(0, 1, 1))
 
     def compute_flow(self, lqs):
         """Compute optical flow using SPyNet for feature alignment.
@@ -932,6 +904,10 @@ class RVRT(nn.Module):
         """
 
         n, t, c, h, w = lqs.size()
+        if c == 1:      # x: (N, T, C, H, W)
+            lqs = lqs.repeat(1, 1, 3, 1, 1)
+            c = 3
+
         lqs_1 = lqs[:, :-1, :, :, :].reshape(-1, c, h, w)
         lqs_2 = lqs[:, 1:, :, :, :].reshape(-1, c, h, w)
 

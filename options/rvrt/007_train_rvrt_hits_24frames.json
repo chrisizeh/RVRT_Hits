@@ -1,5 +1,5 @@
 {
-  "task": "004_train_rvrt_hits"
+  "task": "006_train_rvrt_hits"
   , "model": "vrt"
   , "gpu_ids": [0, 1]
   , "dist": true
@@ -105,7 +105,7 @@
     , "G_param_strict": true
     , "E_param_strict": true
 
-    , "checkpoint_test": 5000           // for testing
+    , "checkpoint_test": 30000           // for testing
     , "checkpoint_save": 5000           // for saving model
     , "checkpoint_print": 200           // for print
   }
