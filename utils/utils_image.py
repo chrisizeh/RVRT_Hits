@@ -225,149 +225,13 @@ def read_img(path):
     # read image by cv2
     # return: Numpy float32, HWC, BGR, [0,1]
     img = cv2.imread(path, cv2.IMREAD_UNCHANGED)  # cv2.IMREAD_GRAYSCALE
-    img = img.astype(np.float32) / 255.
+    img = img.astype(np.float32) / 5.
     if img.ndim == 2:
         img = np.expand_dims(img, axis=2)
     # some images have 4 channels
     if img.shape[2] > 3:
         img = img[:, :, :3]
     return img
-
-
-'''
-# --------------------------------------------
-# image format conversion
-# --------------------------------------------
-# numpy(single) <--->  numpy(uint)
-# numpy(single) <--->  tensor
-# numpy(uint)   <--->  tensor
-# --------------------------------------------
-'''
-
-
-# --------------------------------------------
-# numpy(single) [0, 1] <--->  numpy(uint)
-# --------------------------------------------
-
-
-def uint2single(img):
-
-    return np.float32(img/255.)
-
-
-def single2uint(img):
-
-    return np.uint8((img.clip(0, 1)*255.).round())
-
-
-def uint162single(img):
-
-    return np.float32(img/65535.)
-
-
-def single2uint16(img):
-
-    return np.uint16((img.clip(0, 1)*65535.).round())
-
-
-# --------------------------------------------
-# numpy(uint) (HxWxC or HxW) <--->  tensor
-# --------------------------------------------
-
-
-# convert uint to 4-dimensional torch tensor
-def uint2tensor4(img):
-    if img.ndim == 2:
-        img = np.expand_dims(img, axis=2)
-    return torch.from_numpy(np.ascontiguousarray(img)).permute(2, 0, 1).float().div(255.).unsqueeze(0)
-
-
-# convert uint to 3-dimensional torch tensor
-def uint2tensor3(img):
-    if img.ndim == 2:
-        img = np.expand_dims(img, axis=2)
-    return torch.from_numpy(np.ascontiguousarray(img)).permute(2, 0, 1).float().div(255.)
-
-
-# convert 2/3/4-dimensional torch tensor to uint
-def tensor2uint(img):
-    img = img.data.squeeze().float().clamp_(0, 1).cpu().numpy()
-    if img.ndim == 3:
-        img = np.transpose(img, (1, 2, 0))
-    return np.uint8((img*255.0).round())
-
-
-# --------------------------------------------
-# numpy(single) (HxWxC) <--->  tensor
-# --------------------------------------------
-
-
-# convert single (HxWxC) to 3-dimensional torch tensor
-def single2tensor3(img):
-    return torch.from_numpy(np.ascontiguousarray(img)).permute(2, 0, 1).float()
-
-
-# convert single (HxWxC) to 4-dimensional torch tensor
-def single2tensor4(img):
-    return torch.from_numpy(np.ascontiguousarray(img)).permute(2, 0, 1).float().unsqueeze(0)
-
-
-# convert torch tensor to single
-def tensor2single(img):
-    img = img.data.squeeze().float().cpu().numpy()
-    if img.ndim == 3:
-        img = np.transpose(img, (1, 2, 0))
-
-    return img
-
-# convert torch tensor to single
-def tensor2single3(img):
-    img = img.data.squeeze().float().cpu().numpy()
-    if img.ndim == 3:
-        img = np.transpose(img, (1, 2, 0))
-    elif img.ndim == 2:
-        img = np.expand_dims(img, axis=2)
-    return img
-
-
-def single2tensor5(img):
-    return torch.from_numpy(np.ascontiguousarray(img)).permute(2, 0, 1, 3).float().unsqueeze(0)
-
-
-def single32tensor5(img):
-    return torch.from_numpy(np.ascontiguousarray(img)).float().unsqueeze(0).unsqueeze(0)
-
-
-def single42tensor4(img):
-    return torch.from_numpy(np.ascontiguousarray(img)).permute(2, 0, 1, 3).float()
-
-
-# from skimage.io import imread, imsave
-# def tensor2img(tensor, out_type=np.uint8, min_max=(0, 1)):
-#     '''
-#     Converts a torch Tensor into an image Numpy array of BGR channel order
-#     Input: 4D(B,(3/1),H,W), 3D(C,H,W), or 2D(H,W), any range, RGB channel order
-#     Output: 3D(H,W,C) or 2D(H,W), [0,255], np.uint8 (default)
-#     '''
-#     tensor = tensor.squeeze().float().cpu().clamp_(*min_max)  # squeeze first, then clamp
-#     tensor = (tensor - min_max[0]) / (min_max[1] - min_max[0])  # to range [0,1]
-#     n_dim = tensor.dim()
-#     if n_dim == 4:
-#         n_img = len(tensor)
-#         img_np = make_grid(tensor, nrow=int(math.sqrt(n_img)), normalize=False).numpy()
-#         img_np = np.transpose(img_np[[2, 1, 0], :, :], (1, 2, 0))  # HWC, BGR
-#     elif n_dim == 3:
-#         img_np = tensor.numpy()
-#         img_np = np.transpose(img_np[[2, 1, 0], :, :], (1, 2, 0))  # HWC, BGR
-#     elif n_dim == 2:
-#         img_np = tensor.numpy()
-#     else:
-#         raise TypeError(
-#             'Only support 4D, 3D and 2D tensor. But received with dimension: {:d}'.format(n_dim))
-#     if out_type == np.uint8:
-#         img_np = (img_np * 255.0).round()
-#         # Important. Unlike matlab, numpy.uint8() WILL NOT round by default.
-#     return img_np.astype(out_type)
 
 
 '''
@@ -518,101 +382,6 @@ def shave(img_in, border=0):
     img = img[border:h-border, border:w-border]
     return img
 
-
-'''
-# --------------------------------------------
-# image processing process on numpy image
-# channel_convert(in_c, tar_type, img_list):
-# rgb2ycbcr(img, only_y=True):
-# bgr2ycbcr(img, only_y=True):
-# ycbcr2rgb(img):
-# --------------------------------------------
-'''
-
-
-def rgb2ycbcr(img, only_y=True):
-    '''same as matlab rgb2ycbcr
-    only_y: only return Y channel
-    Input:
-        uint8, [0, 255]
-        float, [0, 1]
-    '''
-    in_img_type = img.dtype
-    img.astype(np.float32)
-    if in_img_type != np.uint8:
-        img *= 255.
-    # convert
-    if only_y:
-        rlt = np.dot(img, [65.481, 128.553, 24.966]) / 255.0 + 16.0
-    else:
-        rlt = np.matmul(img, [[65.481, -37.797, 112.0], [128.553, -74.203, -93.786],
-                              [24.966, 112.0, -18.214]]) / 255.0 + [16, 128, 128]
-    if in_img_type == np.uint8:
-        rlt = rlt.round()
-    else:
-        rlt /= 255.
-    return rlt.astype(in_img_type)
-
-
-def ycbcr2rgb(img):
-    '''same as matlab ycbcr2rgb
-    Input:
-        uint8, [0, 255]
-        float, [0, 1]
-    '''
-    in_img_type = img.dtype
-    img.astype(np.float32)
-    if in_img_type != np.uint8:
-        img *= 255.
-    # convert
-    rlt = np.matmul(img, [[0.00456621, 0.00456621, 0.00456621], [0, -0.00153632, 0.00791071],
-                          [0.00625893, -0.00318811, 0]]) * 255.0 + [-222.921, 135.576, -276.836]
-    rlt = np.clip(rlt, 0, 255)
-    if in_img_type == np.uint8:
-        rlt = rlt.round()
-    else:
-        rlt /= 255.
-    return rlt.astype(in_img_type)
-
-
-def bgr2ycbcr(img, only_y=True):
-    '''bgr version of rgb2ycbcr
-    only_y: only return Y channel
-    Input:
-        uint8, [0, 255]
-        float, [0, 1]
-    '''
-    in_img_type = img.dtype
-    img.astype(np.float32)
-    if in_img_type != np.uint8:
-        img *= 255.
-    # convert
-    if only_y:
-        rlt = np.dot(img, [24.966, 128.553, 65.481]) / 255.0 + 16.0
-    else:
-        rlt = np.matmul(img, [[24.966, 112.0, -18.214], [128.553, -74.203, -93.786],
-                              [65.481, -37.797, 112.0]]) / 255.0 + [16, 128, 128]
-    if in_img_type == np.uint8:
-        rlt = rlt.round()
-    else:
-        rlt /= 255.
-    return rlt.astype(in_img_type)
-
-
-def channel_convert(in_c, tar_type, img_list):
-    # conversion among BGR, gray and y
-    if in_c == 3 and tar_type == 'gray':  # BGR to gray
-        gray_list = [cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) for img in img_list]
-        return [np.expand_dims(img, axis=2) for img in gray_list]
-    elif in_c == 3 and tar_type == 'y':  # BGR to y
-        y_list = [bgr2ycbcr(img, only_y=True) for img in img_list]
-        return [np.expand_dims(img, axis=2) for img in y_list]
-    elif in_c == 1 and tar_type == 'RGB':  # gray/y to BGR
-        return [cv2.cvtColor(img, cv2.COLOR_GRAY2BGR) for img in img_list]
-    else:
-        return img_list
-
-
 '''
 # --------------------------------------------
 # metric, PSNR, SSIM and PSNRB
@@ -624,7 +393,7 @@ def channel_convert(in_c, tar_type, img_list):
 # PSNR
 # --------------------------------------------
 def calculate_psnr(img1, img2, border=0):
-    # img1 and img2 have range [0, 255]
+    # img1 and img2 have range [0, 5]
     #img1 = img1.squeeze()
     #img2 = img2.squeeze()
     if not img1.shape == img2.shape:
@@ -638,7 +407,7 @@ def calculate_psnr(img1, img2, border=0):
     mse = np.mean((img1 - img2)**2)
     if mse == 0:
         return float('inf')
-    return 20 * math.log10(255.0 / math.sqrt(mse))
+    return 20 * math.log10(5.0 / math.sqrt(mse))
 
 
 # --------------------------------------------
@@ -647,7 +416,7 @@ def calculate_psnr(img1, img2, border=0):
 def calculate_ssim(img1, img2, border=0):
     '''calculate SSIM
     the same outputs as MATLAB's
-    img1, img2: [0, 255]
+    img1, img2: [0, 5]
     '''
     #img1 = img1.squeeze()
     #img2 = img2.squeeze()
@@ -672,8 +441,8 @@ def calculate_ssim(img1, img2, border=0):
 
 
 def ssim(img1, img2):
-    C1 = (0.01 * 255)**2
-    C2 = (0.03 * 255)**2
+    C1 = (0.01)**2
+    C2 = (0.03)**2
 
     img1 = img1.astype(np.float64)
     img2 = img2.astype(np.float64)
@@ -739,8 +508,8 @@ def calculate_psnrb(img1, img2, border=0):
     Ref: Quality assessment of deblocked images, for JPEG image deblocking evaluation
     # https://gitlab.com/Queuecumber/quantization-guided-ac/-/blob/master/metrics/psnrb.py
     Args:
-        img1 (ndarray): Images with range [0, 255].
-        img2 (ndarray): Images with range [0, 255].
+        img1 (ndarray): Images with range [0, 5].
+        img2 (ndarray): Images with range [0, 5].
         border (int): Cropped pixels in each edge of an image. These
             pixels are not involved in the PSNR calculation.
         test_y_channel (bool): Test on Y channel of YCbCr. Default: False.
@@ -762,8 +531,8 @@ def calculate_psnrb(img1, img2, border=0):
     img2 = img2.astype(np.float64)
 
     # follow https://gitlab.com/Queuecumber/quantization-guided-ac/-/blob/master/metrics/psnrb.py
-    img1 = torch.from_numpy(img1).permute(2, 0, 1).unsqueeze(0) / 255.
-    img2 = torch.from_numpy(img2).permute(2, 0, 1).unsqueeze(0) / 255.
+    img1 = torch.from_numpy(img1).permute(2, 0, 1).unsqueeze(0)
+    img2 = torch.from_numpy(img2).permute(2, 0, 1).unsqueeze(0)
 
     total = 0
     for c in range(img1.shape[1]):
