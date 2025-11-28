@@ -4,7 +4,6 @@ import math
 import argparse
 import time
 import random
-import cv2
 import numpy as np
 from collections import OrderedDict
 import logging

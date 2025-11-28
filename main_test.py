@@ -87,8 +87,6 @@ def main():
         for i in range(output.shape[1]):
             # save image
             img = output[:, i, ...].data.squeeze().float().cpu().clamp_(0, 5).numpy()
-            if img.ndim == 3:
-                img = np.transpose(img[[2, 1, 0], :, :], (1, 2, 0))  # CHW-RGB to HCW-BGR
             if args.save_result:
                 seq_ = osp.basename(batch['lq_path'][i][0]).split('.')[0]
                 os.makedirs(f'{save_dir}/{folder[0]}', exist_ok=True)
@@ -97,20 +95,12 @@ def main():
             # evaluate psnr/ssim
             if gt is not None:
                 img_gt = gt[:, i, ...].data.squeeze().float().cpu().clamp_(0, 5).numpy()
-                if img_gt.ndim == 3:
-                    img_gt = np.transpose(img_gt[[2, 1, 0], :, :], (1, 2, 0))  # CHW-RGB to HCW-BGR
                 img_gt = np.squeeze(img_gt)
 
                 test_results_folder['psnr'].append(util.calculate_psnr(img, img_gt, border=0))
                 test_results_folder['ssim'].append(util.calculate_ssim(img, img_gt, border=0))
-                if img_gt.ndim == 3:  # RGB image
-                    img = util.bgr2ycbcr(img.astype(np.float32) / 255.) * 255.
-                    img_gt = util.bgr2ycbcr(img_gt.astype(np.float32) / 255.) * 255.
-                    test_results_folder['psnr_y'].append(util.calculate_psnr(img, img_gt, border=0))
-                    test_results_folder['ssim_y'].append(util.calculate_ssim(img, img_gt, border=0))
-                else:
-                    test_results_folder['psnr_y'] = test_results_folder['psnr']
-                    test_results_folder['ssim_y'] = test_results_folder['ssim']
+                test_results_folder['psnr_y'] = test_results_folder['psnr']
+                test_results_folder['ssim_y'] = test_results_folder['ssim']
 
         if gt is not None:
             psnr = sum(test_results_folder['psnr']) / len(test_results_folder['psnr'])
