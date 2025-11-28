@@ -6,8 +6,9 @@ import matplotlib.pyplot as plt
 
 # Paths to your two main folders
 model = "006_train_rvrt_hits" 
-true_path = "/home/czeh/hitsData/high_res"
-reco_path = f"/home/czeh/RVRT_Hits/results/{model}"
+true_path = "/home/czeh/super_res/hitsData/high_res"
+reco_path = f"/home/czeh/super_res/RVRT_Hits/results/{model}"
+>>>>>>> af7aa93 (fix torch load)
 
 ratios = []
 for subfolder in os.listdir(true_path):
@@ -28,8 +29,8 @@ for subfolder in os.listdir(true_path):
             continue  # skip if not found in path2
 
         # Load both images
-        img1 = torch.load(img_path1) 
-        img2 = torch.load(img_path2)
+        img1 = torch.load(img_path1, weights_only=False) 
+        img2 = torch.load(img_path2, weights_only=False)
 
         # Add pixel sums to totals
         total_true += img1.sum()
@@ -48,6 +49,10 @@ print(f"\nMean of ratios: {mean}")
 print(f"\nStandard deviation of ratios: {stdev}")
 
 plt.hist(ratios, bins=50)
+<<<<<<< HEAD
 plt.savefig(f"/home/czeh/RVRT_Hits/results/{model}_ratios.png")
+=======
+plt.savefig(f"/home/czeh/super_res/RVRT_Hits/results/{model}_ratios.png")
+>>>>>>> af7aa93 (fix torch load)
 
 
